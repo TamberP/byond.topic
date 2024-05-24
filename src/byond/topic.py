@@ -8,7 +8,7 @@ TOPIC_RESPONSE_STRING = b'\x06'
 TOPIC_RESPONSE_FLOAT = b'\x2a'
 
 def export(address, port, args):
-    send(address, port, urllib.parse.urlencode(args)
+    send(address, port, urllib.parse.urlencode(args))
 
 def send(address, port, query):
     """Send a Topic() packet to the specified server. Returns the response from the server.
