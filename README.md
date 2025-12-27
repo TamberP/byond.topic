@@ -54,6 +54,8 @@ currently-connected players, or `None` for an invalid response.
 * `TOPIC_PACKET_ID`: The signature that identifies a Topic() packet.
 * `TOPIC_RESPONSE_STRING`: Response-type: string
 * `TOPIC_RESPONSE_FLOAT`: Response-type: float/numeric
+* `MALF_PACKET_ID`: Packet-id that identifies that the server is
+  unhappy with the request you just sent.
 
 ## Examples
 
