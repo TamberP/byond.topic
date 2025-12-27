@@ -2,10 +2,12 @@ import sys
 import socket
 import struct
 import urllib.parse
+import warnings
 
 TOPIC_PACKET_ID = b'\x83'
 TOPIC_RESPONSE_STRING = b'\x06'
 TOPIC_RESPONSE_FLOAT = b'\x2a'
+MALF_PACKET_ID = b'\x08'
 
 def export(address, port, args):
     send(address, port, urllib.parse.urlencode(args))
@@ -29,11 +31,12 @@ def send(address, port, query):
         queryString = query
 
     # Header:
-    # - pad byte
-    # - packetId (0x83)
-    # - big-endian uint16_t packet-size
-    # - pad byte
-    packetSize = len(queryString) + 6
+    # - > big endian
+    # - x pad byte
+    # - c packetId (0x83)
+    # - H uint16_t packet-size
+    # - 5x pad bytes
+    packetSize = len(queryString) + 6 # This *has* to be 6. Determined experimentally.
     if(packetSize >= (2**16-1)):
         raise Exception('query string too big, max packet size exceeded.')
     packet = struct.pack('>xcH5x', TOPIC_PACKET_ID, packetSize) + bytes(queryString, encoding='utf8') + b'\x00'
@@ -44,13 +47,22 @@ def send(address, port, query):
 
     # Response has a 5-byte header, which has a length attribute inside it to
     # tell us how big the response actually is. (Allegedly)
+    # - > big endian
+    # - x padding
+    # - c packet ID.
+    # - H uint16_t response size
+    # - c response type (string/float)
 
     recv_header = sock.recv(5)
     recvPacketId, content_len, response_type = struct.unpack('>xcHc', recv_header)
     if(recvPacketId != TOPIC_PACKET_ID):
-        # How strange. Are we perhaps talking to something that isn't a BYOND server?
         sock.close()
-        raise Exception('Incorrect packet-ID received in response. Expecting 0x83, received {}'.format(recvPacketId))
+        if(recvPacketId == MALF_PACKET_ID):
+            # Whatever you did, the server didn't like it.
+            raise Exception('Bad request')
+        else:
+            # How strange. Are we perhaps talking to something that isn't a BYOND server?
+            raise Exception('Incorrect packet-ID received in response. Expecting 0x83, received {}'.format(recvPacketId))
 
     data = ""
     if(response_type == TOPIC_RESPONSE_STRING):
@@ -60,7 +72,7 @@ def send(address, port, query):
 
     response = sock.recv(content_len)
     if(len(response) < content_len):
-        raise Exception('Truncated response: (' + str(len(response)) + 'of' + str(content_len) + ')')
+        warnings.warn('Possible truncated response: (' + str(len(response)) + 'of' + str(content_len) + ')')
 
     sock.close()
     if(response_type == TOPIC_RESPONSE_STRING):
